@@ -481,7 +481,6 @@ void Chip8::decodeOpCode()
             memory[I + 2] = V[(opcode & 0x0F00) >> 8] % 10;
             pc += 2;
             break;
-        // THE BUG WAS HERE!!!!!!!!!!!!
         // store v0 to vx in memory starting at address I
         case 0x0055:
             for (int j = 0; j <= ((opcode & 0x0F00) >> 8); ++j)
