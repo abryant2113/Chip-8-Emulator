@@ -218,6 +218,9 @@ int main(int argc, char *argv[])
 
         std::this_thread::sleep_for(std::chrono::microseconds(1200));
     }
+
+    free(op_text);
+
     return 0;
 }
 
