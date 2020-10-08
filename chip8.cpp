@@ -1,9 +1,10 @@
 #include <iostream>
 #include <ctime>
+#include <fstream>
 #include "chip8.h"
 
 unsigned char chip8_fontset[80] =
-    {
+{
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
         0x20, 0x60, 0x20, 0x20, 0x70, // 1
         0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
@@ -27,12 +28,37 @@ Chip8::Chip8()
     init();
 };
 
+uint16_t Chip8::getOpcode() {
+    return opcode;
+}
+
+uint16_t Chip8::getProgramCounter() {
+    return pc;
+}
+
+uint16_t Chip8::getInstructionReg() {
+    return I;
+}
+
+uint16_t Chip8::getStackPointer() {
+    return sp;
+}
+
+void write_text_to_log_file( const std::string &text )
+{
+    std::ofstream log_file(
+        "new_log_file.txt", std::ios_base::out | std::ios_base::app );
+    log_file << text << "\n";
+}
+
 void Chip8::init()
 {
     pc = 0x200;
     opcode = 0;
     I = 0;
     sp = 0;
+
+    srand(time(NULL));
 
     for (int i = 0; i < 2048; i++)
     {
@@ -134,12 +160,15 @@ void Chip8::fetchOpCode()
     // each index in our memory array is one byte in length and each opcode instruction is
     // two bytes in length, so we should merge the two instructions together like so
     opcode = memory[pc] << 8 | memory[pc + 1];
+    printf("%x\n", opcode);
 }
 
 void Chip8::decodeOpCode()
 {
+    char opstring[23];
+    int n, val, reg;
 
-    std::cout << "Reading opcode: " << (opcode) << "\n";
+    write_text_to_log_file(opstring);
 
     switch (opcode & 0xF000)
     {
@@ -149,7 +178,6 @@ void Chip8::decodeOpCode()
         {
         // clears the screen
         case 0x0000:
-            printf("Clearing screen...\n");
             // iterates over the graphics memory and clears all bits
             for (int i = 0; i < 2048; i++)
                 gfx[i] = 0;
@@ -159,8 +187,7 @@ void Chip8::decodeOpCode()
             break;
         // return from subroutine
         case 0x000E:
-            printf("Return from subroutine.\n");
-            sp--;
+            --sp;
             pc = stack[sp];
             pc += 2;
             break;
@@ -172,21 +199,22 @@ void Chip8::decodeOpCode()
         break;
     case 0x1000:
         // goto NNN; -- Updates the program counter to jump to the lower 12 bits of the instruction
-        printf("goto NNN\n");
         pc = opcode & 0x0FFF;
         break;
     case 0x2000:
         // calls a subroutine at a specified address
         // push the current program counter onto the stack
-        printf("calling subroutine...\n");
-        stack[sp++] = pc;
+        stack[sp] = pc;
+        sp++;
         // update program counter to be at the address of the subroutine
         pc = opcode & 0x0FFF;
         break;
     case 0x3000:
         // skips the next instruction if VX equals NN -- if(Vx==NN)
         // must shift the resulting index a byte to the right to prevent an IOBE.
-        if (V[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF))
+        val = (opcode & 0x0F00) >> 8;
+        reg = opcode & 0x00FF;
+        if (V[val] == (reg))
         {
             pc += 4;
         }
@@ -208,7 +236,7 @@ void Chip8::decodeOpCode()
         break;
     case 0x5000:
         // skips the next instruction if VX equals VY
-        if (V[(opcode & 0x0F00) >> 8] == V[(opcode & 0x00F0) >> 8])
+        if (V[(opcode & 0x0F00) >> 8] == V[(opcode & 0x00F0) >> 4])
         {
             pc += 4;
         }
@@ -228,6 +256,7 @@ void Chip8::decodeOpCode()
         pc += 2;
         break;
     case 0x8000:
+        //std::cout << "next part of opcode: " << (opcode & 0x000F);
         switch (opcode & 0x000F)
         {
         // assign Vx = Vy
@@ -237,49 +266,40 @@ void Chip8::decodeOpCode()
             break;
         // assign Vx to Vx or Vy (Bitwise Or)
         case 0x0001:
-            V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x0F00) >> 8] | V[(opcode & 0x00F0) >> 4];
+            V[(opcode & 0x0F00) >> 8] |= V[(opcode & 0x00F0) >> 4];
             pc += 2;
             break;
         // Sets Vx to Vx and Vy (Bitwise and)
         case 0x0002:
-            V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x0F00) >> 8] & V[(opcode & 0x00F0) >> 4];
+            V[(opcode & 0x0F00) >> 8] &= V[(opcode & 0x00F0) >> 4];
             pc += 2;
             break;
         // sets Vx to Vx xor Vy (exclusive or)
         case 0x0003:
-            V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x0F00) >> 8] ^ V[(opcode & 0x00F0) >> 4];
+            V[(opcode & 0x0F00) >> 8] ^= V[(opcode & 0x00F0) >> 4];
             pc += 2;
             break;
         // Adds Vy to Vx. VF is set to 1 when there's a carry and 0 when there isn't
         case 0x0004:
             V[(opcode & 0x0F00) >> 8] += V[(opcode & 0x00F0) >> 4];
-            // there's a carry out if Vx + Vy < Vy
-            if (V[(opcode & 0x00F0) >> 4] > (V[(opcode & 0x0F00) >> 8]))
-            {
-                V[0xF] = 1;
-            }
+            if(V[(opcode & 0x00F0) >> 4] > (0xFF - V[(opcode & 0x0F00) >> 8]))
+                V[0xF] = 1; //carry
             else
-            {
                 V[0xF] = 0;
-            }
             pc += 2;
             break;
         // Vy is subtracted from Vx. Vf is set to 0 when there's a borrow, and 1 when there isn't
         case 0x0005:
-            if (V[(opcode & 0x0F00) >> 8] < V[(opcode & 0x00F0) >> 4])
-            {
-                V[0xF] = 0;
-            }
+            if(V[(opcode & 0x00F0) >> 4] > V[(opcode & 0x0F00) >> 8])
+                V[0xF] = 0; // there is a borrow
             else
-            {
                 V[0xF] = 1;
-            }
             V[(opcode & 0x0F00) >> 8] -= V[(opcode & 0x00F0) >> 4];
             pc += 2;
             break;
         // sets the least significant bit of Vx to Vf
         case 0x0006:
-            V[0xF] = (V[(opcode & 0x0F00) >> 8] & 0x1);
+            V[0xF] = V[(opcode & 0x0F00) >> 8] & 0x1;
             V[(opcode & 0x0F00) >> 8] >>= 1;
             pc += 2;
             break;
@@ -298,7 +318,7 @@ void Chip8::decodeOpCode()
             break;
         // stores the most significant bit of Vx in Vf and then shifts Vx to the left by one
         case 0x000E:
-            V[0xF] = V[(opcode & 0x0F00) >> 8] & 0x80;
+            V[0xF] = V[(opcode & 0x0F00) >> 8] >> 7;
             V[(opcode & 0x0F00) >> 8] <<= 1;
             pc += 2;
             break;
@@ -320,18 +340,15 @@ void Chip8::decodeOpCode()
         break;
     // Sets I to the address NNN
     case 0xA000:
-        std::cout << opcode << "Sets I to the address NNN\n";
         I = opcode & 0x0FFF;
         pc += 2;
         break;
     // Jumps to the address NNN plus V0
     case 0xB000:
-        std::cout << opcode << " Jumps to the address NNN plus V0\n";
         pc = (opcode & 0x0FFF) + V[0];
         break;
     // sets vx to the result of a bitwise and operation on a random number
     case 0xC000:
-        srand(time(NULL));
         V[(opcode & 0x0F00) >> 8] = (opcode & 0x00FF) & (std::rand() % 256);
         pc += 2;
         break;
@@ -343,21 +360,23 @@ void Chip8::decodeOpCode()
         unsigned short height = opcode & 0x000F;
         unsigned short pixel;
 
+        // collision flag
         V[0xF] = 0;
+
         for (int yline = 0; yline < height; yline++)
         {
+            // Read sprite from Index + yLine bytes offset from memory
             pixel = memory[I + yline];
             for (int xline = 0; xline < 8; xline++)
             {
+                // Checks each bit of the byte to see if the value is set.
+                // if the bit is set to 1...
                 if ((pixel & (0x80 >> xline)) != 0)
                 {
                     if (gfx[(x + xline + ((y + yline) * 64))] == 1)
                     {
+                        // pixel will be erased
                         V[0xF] = 1;
-                    }
-                    else 
-                    {
-                        V[0xF] = 0;
                     }
                     gfx[x + xline + ((y + yline) * 64)] ^= 1;
                 }
@@ -462,20 +481,23 @@ void Chip8::decodeOpCode()
             memory[I + 2] = V[(opcode & 0x0F00) >> 8] % 10;
             pc += 2;
             break;
+        // THE BUG WAS HERE!!!!!!!!!!!!
         // store v0 to vx in memory starting at address I
         case 0x0055:
-            for (int j = 0; j < (opcode & 0x0F00); j++)
+            for (int j = 0; j <= ((opcode & 0x0F00) >> 8); ++j)
             {
                 memory[I + j] = V[j];
             }
+            I += ((opcode & 0x0F00) >> 8) + 1;
             pc += 2;
             break;
         // fills v0 to vx with values from memory starting at address I
         case 0x0065:
-            for (int j = 0; j < (opcode & 0x0F00); j++)
+            for (int j = 0; j <= ((opcode & 0x0F00) >> 8); ++j)
             {
                 V[j] = memory[I + j];
             }
+            I += ((opcode & 0x0F00) >> 8) + 1;
             pc += 2;
             break;
         default:

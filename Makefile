@@ -1,7 +1,7 @@
 # sets the compiler
 CC := g++
 
-CFLAGS := `sdl2-config --libs --cflags` -ggdb3 -O0 --std=c99 -Wall -lSDL2_image -lm
+CFLAGS := `sdl2-config --libs --cflags` -ggdb3 -O0 --std=c99 -Wall -lSDL2_ttf -lSDL2_image -lm
 
 # header files are listed here
 HDRS := chip8.h

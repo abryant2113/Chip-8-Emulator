@@ -12,10 +12,10 @@ private:
     uint16_t opcode;
 
     uint8_t memory[4096];
+    uint8_t V[16];
 
     bool key_pressed;
-    
-    unsigned char V[16];
+
     unsigned char delay_timer;
     unsigned char sound_timer;
 
@@ -34,6 +34,11 @@ public:
     Chip8();
     bool loadRom(char *);
     void emulateCycle();
+
+    uint16_t getOpcode();
+    uint16_t getProgramCounter();
+    uint16_t getInstructionReg();
+    uint16_t getStackPointer();
 };
 
 #endif
