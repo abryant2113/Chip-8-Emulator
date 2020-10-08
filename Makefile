@@ -24,10 +24,6 @@ glfont: glfont.c Makefile
 $(EXEC): $(OBJS) $(HDRS) Makefile
 	$(CC) -o $@ $(OBJS) $(CFLAGS)
 
-# recipe for building object files
-#$(OBJS): $(@:.o=.c) $(HDRS) Makefile
-#    $(CC) -o $@ $(@:.o=.c) -c $(CFLAGS)
-
 # recipe to clean the workspace
 clean:
 	rm -f $(EXEC) $(OBJS)
