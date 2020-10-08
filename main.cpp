@@ -146,8 +146,6 @@ int main(int argc, char *argv[])
     renderer = SDL_CreateRenderer(win, -1, 0);
     SDL_RenderSetLogicalSize(renderer, w, h);
 
-    cout << "oasjdfiojsdf";
-
     debugTextColor = { 255, 255, 255 };
     gFont = TTF_OpenFont( "16_true_type_fonts/arial.ttf", 28 );
 
